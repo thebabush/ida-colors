@@ -1,0 +1,16 @@
+[project]
+name = "ida-colors"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "idapro>=0.0.4",
+    "lark>=1.2.2",
+    "pydantic>=2.11.7",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.16.1",
+]
