@@ -2,8 +2,7 @@
 
 set -e
 
-RUFF_PKG=ruff@0.12.0
-RUFF="uvx ${RUFF_PKG}"
+RUFF="uv run ruff"
 
 if [ "$#" -eq 0 ]; then
     # No arguments: check the entire codebase
