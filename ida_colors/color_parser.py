@@ -6,7 +6,6 @@ from lark import Lark, Transformer
 from lark.exceptions import LarkError
 from pydantic import BaseModel
 
-
 # --------------------
 # Address Size Enum
 # --------------------
