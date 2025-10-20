@@ -1,4 +1,5 @@
 import atexit
+import codecs
 import json
 import sys
 from typing import Iterable
@@ -27,6 +28,7 @@ def check_roundtrip(tagged_asm: str) -> tuple[str, color_parser.Colors]:
 
 def process_insn(addr: int) -> None:
     asm = ida_lines.generate_disasm_line(addr)
+    print(f'{addr:08X}:', codecs.encode(asm.encode('ascii'), 'hex').decode('ascii'))
     raw_asm, colors = check_roundtrip(asm)
     print(f'    {json.dumps(raw_asm)}')
     for line in pp(colors):

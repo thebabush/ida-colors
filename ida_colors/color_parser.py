@@ -114,7 +114,7 @@ class ColorTag(Enum):
     CNAME = 37
     UNAME = 38
     COLLAPSED = 39
-    FG_MAX = 40
+    ADDR = 40  # Also FG_MAX
     OPND1 = 41
     OPND2 = 42
     OPND3 = 43
@@ -217,7 +217,7 @@ class ColorStringParser:
         color_byte = self.consume()
 
         # Parse content until we find matching COLOR_OFF
-        content = []
+        content: list[Colors] = []
         while not self.at_end():
             byte = self.peek()
             if byte == 0x02:  # COLOR_OFF
@@ -266,7 +266,7 @@ class ColorStringParser:
                 chars.append(chr(self.consume()))
         return ''.join(chars)
 
-    def parse_text(self) -> str:
+    def parse_text(self) -> str | None:
         """Parse plain text (non-control characters with escaping)."""
         chars = []
         while not self.at_end():
