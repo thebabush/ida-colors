@@ -8,7 +8,6 @@ from ida_colors.color_parser import (
     ColorNode,
     Colors,
     ColorTag,
-    lift_ast,
     parse_colored_string,
     simplify_color_tree,
 )
@@ -17,7 +16,7 @@ from ida_colors.color_parser import (
 def parse_lift(s: str) -> Colors:
     tree = parse_colored_string(s)
     print(tree)
-    return lift_ast(tree)
+    return tree
 
 
 def dump_with_types(obj: Any) -> Any:

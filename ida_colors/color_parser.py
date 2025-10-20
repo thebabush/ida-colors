@@ -4,15 +4,25 @@ from typing import NewType, Optional, Sequence
 from pydantic import BaseModel
 
 # --------------------
-# Address Size Enum
+# Enums
 # --------------------
+
+
+class ControlChar(Enum):
+    """IDA Pro control characters for colored strings."""
+
+    COLOR_ON = 0x01
+    COLOR_OFF = 0x02
+    COLOR_ESC = 0x03
+    COLOR_INV = 0x04
+    COLOR_ADDR = 0x28
 
 
 class AddressSize(Enum):
     """Address size for parsing colored strings."""
 
     BITS_32 = 8
-    BITS_64 = 16  # Default
+    BITS_64 = 16
 
 
 # --------------------
@@ -196,13 +206,13 @@ class ColorStringParser:
         if byte is None:
             return None
 
-        if byte == 0x01:  # COLOR_ON
+        if byte == ControlChar.COLOR_ON.value:
             next_byte = self.peek(1)
-            if next_byte == 0x28:  # COLOR_ADDR
+            if next_byte == ControlChar.COLOR_ADDR.value:
                 return self.parse_color_addr()
             else:
                 return self.parse_color_node()
-        elif byte == 0x04:  # COLOR_INV
+        elif byte == ControlChar.COLOR_INV.value:
             raise NotImplementedError('COLOR_INV is not supported')
         else:
             return self.parse_text()
@@ -210,7 +220,7 @@ class ColorStringParser:
     def parse_color_node(self) -> ColorNode:
         """Parse a colored node: COLOR_ON color_tag content* COLOR_OFF color_tag."""
         # Parse COLOR_ON
-        if self.consume() != 0x01:
+        if self.consume() != ControlChar.COLOR_ON.value:
             raise ParseError('Expected COLOR_ON')
 
         # Parse color tag
@@ -220,7 +230,7 @@ class ColorStringParser:
         content: list[Colors] = []
         while not self.at_end():
             byte = self.peek()
-            if byte == 0x02:  # COLOR_OFF
+            if byte == ControlChar.COLOR_OFF.value:
                 # Check if this is the matching close tag
                 if self.peek(1) == color_byte:
                     self.consume()  # consume COLOR_OFF
@@ -236,7 +246,10 @@ class ColorStringParser:
     def parse_color_addr(self) -> ColorAddr:
         """Parse a color address: COLOR_ON COLOR_ADDR addr_bytes text."""
         # Consume COLOR_ON and COLOR_ADDR
-        if self.consume() != 0x01 or self.consume() != 0x28:
+        if (
+            self.consume() != ControlChar.COLOR_ON.value
+            or self.consume() != ControlChar.COLOR_ADDR.value
+        ):
             raise ParseError('Expected COLOR_ON COLOR_ADDR')
 
         # Parse address bytes (hex string)
@@ -254,11 +267,17 @@ class ColorStringParser:
     def parse_addr_text(self) -> str:
         """Parse text following an address (until control character)."""
         chars = []
+        control_chars = {
+            ControlChar.COLOR_ON.value,
+            ControlChar.COLOR_OFF.value,
+            ControlChar.COLOR_ESC.value,
+            ControlChar.COLOR_INV.value,
+        }
         while not self.at_end():
             byte = self.peek()
-            if byte in (0x01, 0x02, 0x03, 0x04):  # Control characters
+            if byte in control_chars:
                 break
-            if byte == 0x03:  # COLOR_ESC
+            if byte == ControlChar.COLOR_ESC.value:
                 self.consume()
                 if not self.at_end():
                     chars.append(chr(self.consume()))
@@ -269,11 +288,16 @@ class ColorStringParser:
     def parse_text(self) -> str | None:
         """Parse plain text (non-control characters with escaping)."""
         chars = []
+        control_chars = {
+            ControlChar.COLOR_ON.value,
+            ControlChar.COLOR_OFF.value,
+            ControlChar.COLOR_INV.value,
+        }
         while not self.at_end():
             byte = self.peek()
-            if byte in (0x01, 0x02, 0x04):  # Control characters (not ESC)
+            if byte in control_chars:
                 break
-            if byte == 0x03:  # COLOR_ESC
+            if byte == ControlChar.COLOR_ESC.value:
                 self.consume()
                 if not self.at_end():
                     chars.append(chr(self.consume()))
@@ -310,11 +334,6 @@ def parse_colored_string(s: str, address_size: AddressSize = AddressSize.BITS_64
     """Parse colored string."""
     parser = ColorParser(address_size)
     return parser.parse(s)
-
-
-def lift_ast(ast: ColorNode) -> ColorNode:
-    """Lift AST to ColorNode (no-op for compatibility)."""
-    return ast
 
 
 def simplify_one(node: Colors) -> Colors:
