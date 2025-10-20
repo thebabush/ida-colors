@@ -15,8 +15,8 @@ from pydantic import BaseModel
 class AddressSize(Enum):
     """Address size for parsing colored strings."""
 
-    BITS_32 = 8  # 8 hex characters for 32-bit addresses
-    BITS_64 = 16  # 16 hex characters for 64-bit addresses
+    BITS_32 = 8
+    BITS_64 = 16  # Default
 
 
 # --------------------
@@ -69,76 +69,73 @@ Colors = ColorNode | str | ColorAddr
 # IDA Color Definitions
 # --------------------
 
+
 class UnknownColorError(ValueError):
     def __init__(self, value: int):
         super().__init__(f'Unknown COLOR tag: 0x{value:02X}')
         self.value = value
 
 
-def get_color_tags() -> dict[int, str]:
-    """IDA Pro COLOR_ constants mapping."""
-    return {
-        1: 'COLOR_DEFAULT',
-        2: 'COLOR_SELECTED',
-        3: 'COLOR_RPTCMT',
-        4: 'COLOR_REGFUNC',
-        5: 'COLOR_INSN',
-        6: 'COLOR_DATNAME',
-        7: 'COLOR_UNKNOWN',
-        8: 'COLOR_EXTERN',
-        9: 'COLOR_SYMBOL',
-        10: 'COLOR_CURLINE',
-        11: 'COLOR_STRING',
-        12: 'COLOR_NUMBER',
-        13: 'COLOR_VOIDOP',
-        14: 'COLOR_CREF',
-        15: 'COLOR_DREF',
-        16: 'COLOR_CREFTAIL',
-        17: 'COLOR_DREFTAIL',
-        18: 'COLOR_ERROR',
-        19: 'COLOR_PREFIX',
-        20: 'COLOR_BINPREF',
-        21: 'COLOR_EXTRA',
-        22: 'COLOR_ALTOP',
-        23: 'COLOR_HIDNAME',
-        24: 'COLOR_LIBNAME',
-        25: 'COLOR_LOCNAME',
-        26: 'COLOR_CODNAME',
-        27: 'COLOR_ASMDIR',
-        28: 'COLOR_MACRO',
-        29: 'COLOR_DSTR',
-        30: 'COLOR_DCHAR',
-        31: 'COLOR_DNUM',
-        32: 'COLOR_KEYWORD',
-        33: 'COLOR_REG',
-        34: 'COLOR_IMPNAME',
-        35: 'COLOR_SEGNAME',
-        36: 'COLOR_UNKNAME',
-        37: 'COLOR_CNAME',
-        38: 'COLOR_UNAME',
-        39: 'COLOR_COLLAPSED',
-        40: 'COLOR_FG_MAX',
-        41: 'COLOR_OPND1',
-        42: 'COLOR_OPND2',
-        43: 'COLOR_OPND3',
-        44: 'COLOR_OPND4',
-        45: 'COLOR_OPND5',
-        46: 'COLOR_OPND6',
-        47: 'COLOR_OPND7',
-        48: 'COLOR_OPND8',
-        51: 'COLOR_RESERVED1',
-        52: 'COLOR_LUMINA',
-    }
+class ColorTag(Enum):
+    """IDA Pro color tag constants."""
 
+    DEFAULT = 1
+    SELECTED = 2
+    RPTCMT = 3
+    REGFUNC = 4
+    INSN = 5
+    DATNAME = 6
+    UNKNOWN = 7
+    EXTERN = 8
+    SYMBOL = 9
+    CURLINE = 10
+    STRING = 11
+    NUMBER = 12
+    VOIDOP = 13
+    CREF = 14
+    DREF = 15
+    CREFTAIL = 16
+    DREFTAIL = 17
+    ERROR = 18
+    PREFIX = 19
+    BINPREF = 20
+    EXTRA = 21
+    ALTOP = 22
+    HIDNAME = 23
+    LIBNAME = 24
+    LOCNAME = 25
+    CODNAME = 26
+    ASMDIR = 27
+    MACRO = 28
+    DSTR = 29
+    DCHAR = 30
+    DNUM = 31
+    KEYWORD = 32
+    REG = 33
+    IMPNAME = 34
+    SEGNAME = 35
+    UNKNAME = 36
+    CNAME = 37
+    UNAME = 38
+    COLLAPSED = 39
+    FG_MAX = 40
+    OPND1 = 41
+    OPND2 = 42
+    OPND3 = 43
+    OPND4 = 44
+    OPND5 = 45
+    OPND6 = 46
+    OPND7 = 47
+    OPND8 = 48
+    RESERVED1 = 51
+    LUMINA = 52
 
-COLOR_TAGS = get_color_tags()
-
-
-def get_color_name(color_val: int) -> str:
-    """Convert color byte to symbolic name. Raises if unknown."""
-    if color_val not in COLOR_TAGS:
-        raise UnknownColorError(color_val)
-    return COLOR_TAGS[color_val]
+    @classmethod
+    def from_int(cls, value: int) -> 'ColorTag':
+        try:
+            return cls(value)
+        except ValueError:
+            raise UnknownColorError(value)
 
 
 # --------------------
@@ -314,7 +311,7 @@ def pp(node: Colors, indent: int = 0, level: int = 0) -> str:
     match node:
         case ColorNode(color=color, content=content):
             if color is not None:
-                color_name = get_color_name(color)
+                color_name = ColorTag.from_int(color).name
             else:
                 color_name = '_'
 

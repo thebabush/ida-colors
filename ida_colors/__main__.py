@@ -61,7 +61,7 @@ def _pp(colors: color_parser.Colors) -> Iterable[str]:
     match colors:
         case color_parser.ColorNode(color=color, content=content):
             if color is not None:
-                color_name = color_parser.get_color_name(color).replace('COLOR_', '').title()
+                color_name = color_parser.ColorTag.from_int(color).name.title()
             else:
                 color_name = '_'
             yield f'{color_name}('

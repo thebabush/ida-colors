@@ -7,7 +7,7 @@ from ida_colors.color_parser import (
     ColorAddr,
     ColorNode,
     Colors,
-    get_color_name,
+    ColorTag,
     lift_ast,
     parse_colored_string,
     simplify_color_tree,
@@ -26,7 +26,8 @@ def dump_with_types(obj: Any) -> Any:
         result = {'_': cls.__name__}
         for field in obj.__class__.model_fields:
             if field == 'color' and getattr(obj, 'color', None) is not None:
-                result[field] = get_color_name(getattr(obj, 'color'))
+                color_val = getattr(obj, 'color')
+                result[field] = ColorTag.from_int(color_val).name
             else:
                 result[field] = dump_with_types(getattr(obj, field))
         return result
