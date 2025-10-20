@@ -1,9 +1,6 @@
 from enum import Enum
-from typing import Any, NewType, Optional, Sequence
+from typing import NewType, Optional, Sequence
 
-import lark
-from lark import Lark, Transformer
-from lark.exceptions import LarkError
 from pydantic import BaseModel
 
 # --------------------
@@ -138,62 +135,152 @@ class ColorTag(Enum):
 
 
 # --------------------
-# Lark Grammar and Parser
+# Custom Parser
 # --------------------
 
 
-class ColorTransformer(Transformer):
-    def __init__(self) -> None:
-        super().__init__()
+class ParseError(Exception):
+    """Error during parsing."""
 
-    def text(self, chars: list[str]) -> str:
-        return ''.join(chars)
+    pass
 
-    def escaped_char(self, items: list) -> str:
-        return items[1]
 
-    def color_inv(self, items: Any) -> None:
-        raise NotImplementedError('COLOR_INV is not supported')
-        # This escape character has no corresponding #COLOR_OFF.
-        # Its action continues until the next #COLOR_INV or end of line.
+class ColorStringParser:
+    """Custom parser for IDA Pro colored strings."""
 
-    def color_addr(self, items: list) -> ColorAddr:
-        _1, _2, addr, text = items
+    def __init__(self, s: str, address_size: AddressSize):
+        self.s = s
+        self.pos = 0
+        self.length = len(s)
+        self.address_size = address_size
+
+    def peek(self, offset: int = 0) -> int | None:
+        """Peek at byte at current position + offset."""
+        idx = self.pos + offset
+        if idx < self.length:
+            return ord(self.s[idx])
+        return None
+
+    def consume(self) -> int:
+        """Consume and return current byte."""
+        if self.pos >= self.length:
+            raise ParseError('Unexpected end of input')
+        byte = ord(self.s[self.pos])
+        self.pos += 1
+        return byte
+
+    def consume_bytes(self, n: int) -> str:
+        """Consume n bytes and return as string."""
+        if self.pos + n > self.length:
+            raise ParseError('Unexpected end of input')
+        result = self.s[self.pos : self.pos + n]
+        self.pos += n
+        return result
+
+    def at_end(self) -> bool:
+        """Check if at end of input."""
+        return self.pos >= self.length
+
+    def parse_colored_string(self) -> ColorNode:
+        """Parse the entire colored string."""
+        content = []
+        while not self.at_end():
+            item = self.parse_content()
+            if item is not None:
+                content.append(item)
+        return ColorNode(color=None, content=content)
+
+    def parse_content(self) -> Colors | None:
+        """Parse a content item (color_node, color_addr, or text)."""
+        byte = self.peek()
+        if byte is None:
+            return None
+
+        if byte == 0x01:  # COLOR_ON
+            next_byte = self.peek(1)
+            if next_byte == 0x28:  # COLOR_ADDR
+                return self.parse_color_addr()
+            else:
+                return self.parse_color_node()
+        elif byte == 0x04:  # COLOR_INV
+            raise NotImplementedError('COLOR_INV is not supported')
+        else:
+            return self.parse_text()
+
+    def parse_color_node(self) -> ColorNode:
+        """Parse a colored node: COLOR_ON color_tag content* COLOR_OFF color_tag."""
+        # Parse COLOR_ON
+        if self.consume() != 0x01:
+            raise ParseError('Expected COLOR_ON')
+
+        # Parse color tag
+        color_byte = self.consume()
+
+        # Parse content until we find matching COLOR_OFF
+        content = []
+        while not self.at_end():
+            byte = self.peek()
+            if byte == 0x02:  # COLOR_OFF
+                # Check if this is the matching close tag
+                if self.peek(1) == color_byte:
+                    self.consume()  # consume COLOR_OFF
+                    self.consume()  # consume color tag
+                    return ColorNode(color=color_byte, content=content)
+
+            item = self.parse_content()
+            if item is not None:
+                content.append(item)
+
+        raise ParseError('Unclosed color tag')
+
+    def parse_color_addr(self) -> ColorAddr:
+        """Parse a color address: COLOR_ON COLOR_ADDR addr_bytes text."""
+        # Consume COLOR_ON and COLOR_ADDR
+        if self.consume() != 0x01 or self.consume() != 0x28:
+            raise ParseError('Expected COLOR_ON COLOR_ADDR')
+
+        # Parse address bytes (hex string)
+        addr_hex = self.consume_bytes(self.address_size.value)
+        try:
+            addr = int(addr_hex, 16)
+        except ValueError:
+            raise ParseError(f'Invalid hex address: {addr_hex}')
+
+        # Parse text until COLOR_OFF or another control character
+        text = self.parse_addr_text()
+
         return ColorAddr(addr=addr, text=text)
 
-    def texts(self, items: list[str]) -> str:
-        return ''.join(items)
+    def parse_addr_text(self) -> str:
+        """Parse text following an address (until control character)."""
+        chars = []
+        while not self.at_end():
+            byte = self.peek()
+            if byte in (0x01, 0x02, 0x03, 0x04):  # Control characters
+                break
+            if byte == 0x03:  # COLOR_ESC
+                self.consume()
+                if not self.at_end():
+                    chars.append(chr(self.consume()))
+            else:
+                chars.append(chr(self.consume()))
+        return ''.join(chars)
 
-    def color_off_tag(self, items: list[lark.Token]) -> ColorOff:
-        return ColorOff(color=Color(ord(items[1].value)))
+    def parse_text(self) -> str:
+        """Parse plain text (non-control characters with escaping)."""
+        chars = []
+        while not self.at_end():
+            byte = self.peek()
+            if byte in (0x01, 0x02, 0x04):  # Control characters (not ESC)
+                break
+            if byte == 0x03:  # COLOR_ESC
+                self.consume()
+                if not self.at_end():
+                    chars.append(chr(self.consume()))
+            else:
+                chars.append(chr(self.consume()))
 
-    def color_on_tag(self, items: list[lark.Token]) -> ColorOn:
-        return ColorOn(color=Color(ord(items[1].value)))
-
-    def color_node(self, items: list) -> ColorNode:
-        color_on: ColorOn = items[0]
-        color_off: ColorOff = items[-1]
-
-        # Validate matching tags
-        if color_on.color != color_off.color:
-            raise ValueError(f'Mismatched color tags: {color_on} vs {color_off}')
-
-        content = items[1:-1]  # Everything between color tags
-
-        return ColorNode(color=color_on.color, content=content)
-
-    def color_tag(self, items: list[str]) -> str:
-        return items[0]
-
-    def addr_bytes(self, items: list[lark.Token]) -> int:
-        assert len(items) == 1
-        return int(items[0].value, 16)
-
-    def start(self, items: Sequence[ColorNode]) -> ColorNode:
-        return ColorNode(color=None, content=items)
-
-    def content(self, items: list) -> ColorNode:
-        return ColorNode(color=None, content=items)
+        return ''.join(chars) if chars else None
 
 
 class ColorParser:
@@ -201,58 +288,15 @@ class ColorParser:
 
     def __init__(self, address_size: AddressSize = AddressSize.BITS_64):
         self.address_size = address_size
-        self._grammar = self._build_grammar()
-        self._parser = Lark(self._grammar, parser='lalr')
-        self._transformer = ColorTransformer()
 
-    def _build_grammar(self) -> str:
-        """Build Lark grammar based on address size."""
-        addr_hex_chars = self.address_size.value
-        return f"""
-?start: content*
-
-content: color_addr
-       | color_node
-       | color_inv
-       | texts
-
-color_node: color_on_tag content* color_off_tag
-color_addr: COLOR_ON COLOR_ADDR addr_bytes texts
-color_inv: COLOR_INV
-texts: text+
-
-text: escaped_char | CHAR
-
-color_on_tag: COLOR_ON color_tag
-color_off_tag: COLOR_OFF color_tag
-escaped_char: COLOR_ESC ANY_CHAR
-
-COLOR_ON: "\\x01"
-COLOR_OFF: "\\x02"
-COLOR_ESC: "\\x03"
-COLOR_INV: "\\x04"
-COLOR_ADDR: "\\x28"
-color_tag: /./
-addr_bytes: /[0-9a-fA-F]{{{addr_hex_chars}}}/
-CHAR: /[^\\x01-\\x04]/
-ANY_CHAR: /./
-"""
-
-    def parse(self, s: str) -> lark.Tree:
-        """Parse colored string using Lark parser."""
-        try:
-            return self._parser.parse(s)
-        except LarkError:
-            raise
-
-    def lift_ast(self, ast: lark.Tree) -> ColorNode:
-        """Lift AST to ColorNode."""
-        return self._transformer.transform(ast)
+    def parse(self, s: str) -> ColorNode:
+        """Parse colored string."""
+        parser = ColorStringParser(s, self.address_size)
+        return parser.parse_colored_string()
 
     def parse_full(self, s: str) -> Colors:
         """Parse a colored string and simplify it."""
-        tree = self.parse(s)
-        colors = self.lift_ast(tree)
+        colors = self.parse(s)
         colors = simplify_color_tree(colors)
         return colors
 
@@ -262,16 +306,15 @@ ANY_CHAR: /./
 # --------------------
 
 
-def parse_colored_string(s: str, address_size: AddressSize = AddressSize.BITS_64) -> lark.Tree:
-    """Parse colored string using Lark parser."""
+def parse_colored_string(s: str, address_size: AddressSize = AddressSize.BITS_64) -> ColorNode:
+    """Parse colored string."""
     parser = ColorParser(address_size)
     return parser.parse(s)
 
 
-def lift_ast(ast: lark.Tree) -> ColorNode:
-    """Lift AST to ColorNode."""
-    transformer = ColorTransformer()
-    return transformer.transform(ast)
+def lift_ast(ast: ColorNode) -> ColorNode:
+    """Lift AST to ColorNode (no-op for compatibility)."""
+    return ast
 
 
 def simplify_one(node: Colors) -> Colors:

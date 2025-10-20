@@ -44,6 +44,10 @@ def pp(colors: color_parser.Colors) -> Iterable[str]:
         yield ''.join(_pp(mnemonic))
         for operand in operands:
             match operand:
+                case str():
+                    # Skip whitespace-only strings
+                    if not operand.strip():
+                        continue
                 case color_parser.ColorNode(color=None, content=[str()]):
                     # Skip whitespaces
                     assert isinstance(operand.content[0], str)
@@ -66,7 +70,9 @@ def _pp(colors: color_parser.Colors) -> Iterable[str]:
                 color_name = '_'
             yield f'{color_name}('
 
-            tokens = [_pp(c) for c in content]
+            # Filter out whitespace-only strings
+            filtered_content = [c for c in content if not (isinstance(c, str) and c.strip() == '')]
+            tokens = [_pp(c) for c in filtered_content]
             for ith, token in enumerate(tokens):
                 yield from token
                 if ith < len(tokens) - 1:
