@@ -5,12 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "idapro>=0.0.4",
     "lark>=1.2.2",
     "pydantic>=2.11.7",
 ]
 
 [dependency-groups]
 dev = [
+    "idapro>=0.0.4",
     "mypy>=1.16.1",
+    "pytest>=8.4.2",
 ]
