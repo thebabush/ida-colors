@@ -1,6 +1,5 @@
 import argparse
 import atexit
-import codecs
 import json
 from collections.abc import Iterable
 
@@ -27,7 +26,7 @@ def check_roundtrip(tagged_asm: str) -> tuple[str, color_parser.Colors]:
 
 def process_insn(addr: int) -> None:
     asm = ida_lines.generate_disasm_line(addr)
-    print(f'{addr:08X}:', codecs.encode(asm.encode('ascii'), 'hex').decode('ascii'))
+    print(f'{addr:08X}:', asm.encode('ascii').hex())
     raw_asm, colors = check_roundtrip(asm)
     print(f'    {json.dumps(raw_asm)}')
     for line in pp(colors):
@@ -39,47 +38,27 @@ def pp(colors: color_parser.Colors) -> Iterable[str]:
     """Pretty print a colored string."""
     assert isinstance(colors, color_parser.ColorNode)
     mnemonic, *operands = colors.content
-
-    if len(operands) > 0:
+    if operands:
         assert colors.color is None
-        yield ''.join(_pp(mnemonic))
-        for operand in operands:
-            match operand:
-                case str():
-                    # Skip whitespace-only strings
-                    if not operand.strip():
-                        continue
-                case color_parser.ColorNode(color=None, content=[str()]):
-                    # Skip whitespaces
-                    assert isinstance(operand.content[0], str)
-                    if not operand.content[0].strip():
-                        continue
-                case color_parser.ColorNode(color=ida_lines.COLOR_SYMBOL, content=[',']):
-                    continue
-            yield ''.join(_pp(operand))
-    else:
-        yield ''.join(_pp(mnemonic))
+
+    yield ''.join(_pp(mnemonic))
+    for operand in operands:
+        match operand:
+            case str() if not operand.strip():
+                continue
+            case color_parser.ColorNode(color=ida_lines.COLOR_SYMBOL, content=[',']):
+                continue
+        yield ''.join(_pp(operand))
 
 
 def _pp(colors: color_parser.Colors) -> Iterable[str]:
     """Pretty print a colored string."""
     match colors:
         case color_parser.ColorNode(color=color, content=content):
-            if color is not None:
-                color_name = color_parser.ColorTag.from_int(color).name.title()
-            else:
-                color_name = '_'
-            yield f'{color_name}('
-
-            # Filter out whitespace-only strings
-            filtered_content = [c for c in content if not (isinstance(c, str) and c.strip() == '')]
-            tokens = [_pp(c) for c in filtered_content]
-            for ith, token in enumerate(tokens):
-                yield from token
-                if ith < len(tokens) - 1:
-                    yield ', '
-
-            yield ')'
+            color_name = color_parser.ColorTag.from_int(color).name.title() if color is not None else '_'
+            # Skip whitespace-only strings
+            children = [''.join(_pp(c)) for c in content if not (isinstance(c, str) and not c.strip())]
+            yield f'{color_name}({", ".join(children)})'
 
         case color_parser.ColorAddr(addr=addr, text=text):
             yield f'Addr({addr:08X}, {text!r})'
