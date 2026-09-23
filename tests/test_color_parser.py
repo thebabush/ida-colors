@@ -1,6 +1,7 @@
 import pytest
 
 from ida_colors.color_parser import (
+    AddressSize,
     ColorAddr,
     ColorNode,
     ColorTag,
@@ -88,6 +89,48 @@ def test_addr_text_stops_at_escape() -> None:
     assert parse_colored_string(raw) == ColorNode(color=None, content=[ColorAddr(addr=0x1234, text='ab'), '!c'])
 
 
+def test_color_inv_is_skipped() -> None:
+    # COLOR_INV has no tag byte and no payload. Text on both sides joins like tag_remove does.
+    assert parse_colored_string('a\x04b') == ColorNode(color=None, content=['ab'])
+
+
+def test_color_inv_before_closing_brace() -> None:
+    # From Hex-Rays pseudocode: two INVs before a block-closing `}`.
+    raw = '\x04\x04\x01\t}\x02\t\x01(0000000000000000'
+    tree = parse_colored_string(raw)
+    assert tree == ColorNode(color=None, content=[ColorNode(color=9, content=['}']), ColorAddr(addr=0, text='')])
+    assert tag_remove(tree) == '}'
+
+
+def test_autocmt_tag_is_not_color_inv() -> None:
+    # 0x04 right after ON/OFF is the AUTOCMT tag byte, not COLOR_INV.
+    assert parse_full('\x01\x04x\x02\x04') == ColorNode(color=ColorTag.AUTOCMT.value, content=['x'])
+
+
+@pytest.mark.parametrize('kind', ['\x01', '\x02', '\x04'])
+def test_semspan_header_is_dropped(kind: str) -> None:
+    # The kind byte is part of the header even when it looks like a control char.
+    raw = f'\x01\x36{kind}\x01\x25name\x02\x25\x02\x36'
+    tree = parse_full(raw)
+    assert tree == ColorNode(color=54, content=[ColorNode(color=0x25, content=['name'])])
+    assert tag_remove(tree) == 'name'
+
+
+def test_semspan_tid_payload_is_dropped() -> None:
+    # SEMK_LOCAL_TYPE_BY_TID carries a tid encoded like an address.
+    raw = '\x01\x36\x03000000000000abcdFoo\x02\x36'
+    assert parse_full(raw) == ColorNode(color=54, content=['Foo'])
+
+
+def test_semspan_tid_payload_32_bit() -> None:
+    raw = '\x01\x36\x030000abcdFoo\x02\x36'
+    assert parse_full(raw, AddressSize.BITS_32) == ColorNode(color=54, content=['Foo'])
+
+
+def test_semspan_is_group_alias() -> None:
+    assert ColorTag.SEMSPAN is ColorTag.GROUP
+
+
 @pytest.mark.parametrize(
     ('raw', 'error'),
     [
@@ -95,7 +138,8 @@ def test_addr_text_stops_at_escape() -> None:
         ('\x01', ParseError),  # ON without a tag
         ('\x01(0123', ParseError),  # truncated address
         ('\x01(zzzzzzzzzzzzzzzz', ParseError),  # non-hex address
-        ('a\x04b', NotImplementedError),  # COLOR_INV
+        ('\x01\x36', ParseError),  # SEMSPAN without a kind
+        ('\x01\x36\x030123', ParseError),  # truncated SEMSPAN tid
         ('\x01\x05\x01\x06a\x02\x05\x02\x06', ParseError),  # crossed tags: OFF 5 is skipped, so 5 stays open
     ],
 )

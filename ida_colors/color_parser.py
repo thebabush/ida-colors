@@ -107,6 +107,7 @@ class ColorTag(Enum):
     LUMINA = 52
     ADDR_EXPR = 53
     GROUP = 54
+    SEMSPAN = 54  # noqa: PIE796  # Intentional alias: IDA's name for GROUP after 9.4, which added a header.
 
     @classmethod
     def from_int(cls, value: int) -> 'ColorTag':
@@ -131,8 +132,10 @@ _HEX_DIGITS = frozenset(string.hexdigits)
 @cache
 def _tokenizer(address_size: AddressSize) -> re.Pattern[str]:
     # One token per match. Address text stops at any control char. Plain text runs through escapes (ESC + any char).
+    # A SEMSPAN header is one kind byte, plus a tid payload as long as an address for SEMK_LOCAL_TYPE_BY_TID (3).
     return re.compile(
         rf'(?P<addr>\x01\x28)(?:(?P<hex>.{{{address_size.value}}})(?P<addr_text>[^\x01-\x04]*))?'
+        rf'|(?P<semspan>\x01\x36)(?P<sem_header>\x03.{{{address_size.value}}}|[^\x03])?'
         r'|\x01(?P<on>.)'
         r'|\x02(?P<off>.)'
         r'|(?P<text>(?:[^\x01-\x04]|\x03.?)+)'
@@ -154,6 +157,11 @@ def parse_colored_string(s: str, address_size: AddressSize = AddressSize.BITS_64
             if not _HEX_DIGITS.issuperset(addr_hex):
                 raise ParseError(f'Invalid hex address: {addr_hex}')
             content.append(ColorAddr(addr=int(addr_hex, 16), text=m['addr_text']))
+        elif m['semspan'] is not None:
+            # The header is dropped like tag_remove does. The span is an ordinary tag 54 node.
+            if m['sem_header'] is None:
+                raise ParseError('Unexpected end of input')
+            stack.append((ColorTag.SEMSPAN.value, []))
         elif (on := m['on']) is not None:
             stack.append((ord(on), []))
         elif (off := m['off']) is not None:
@@ -163,13 +171,14 @@ def parse_colored_string(s: str, address_size: AddressSize = AddressSize.BITS_64
                 stack[-1][1].append(ColorNode(color=color, content=children))
         elif (text := m['text']) is not None:
             text = re.sub(r'\x03(.?)', r'\1', text, flags=re.DOTALL)
-            # Text on both sides of a skipped OFF joins into one string.
+            # Text on both sides of a skipped OFF or INV joins into one string.
             if content and isinstance(content[-1], str):
                 content[-1] += text
             elif text:
                 content.append(text)
         elif m['bad'] == chr(ControlChar.COLOR_INV.value):
-            raise NotImplementedError('COLOR_INV is not supported')
+            # A lone invisible byte with no tag or payload, e.g. two before a Hex-Rays `}`. Skip it like tag_remove.
+            continue
         else:
             raise ParseError('Unexpected end of input')
     if len(stack) > 1:
