@@ -16,6 +16,22 @@ dev = [
     "ty>=0.0.83",
 ]
 
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# ANN stands in for mypy's `disallow_untyped_defs`, which ty has no equivalent for.
+select = ["E", "F", "I", "W", "UP", "B", "C4", "PIE", "PGH", "ISC", "PERF", "RUF", "ANN"]
+ignore = [
+    "ANN401",  # explicit `Any` is allowed, as in mypy strict
+]
+
+[tool.ruff.lint.flake8-annotations]
+mypy-init-return = true
+
+[tool.ruff.format]
+quote-style = "single"
+
 [tool.ty.rules]
 # Roughly mypy's `strict`: turn on the checks ty leaves off by default.
 division-by-zero = "error"
