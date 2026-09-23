@@ -51,6 +51,3 @@ encode, not what they mean:
 | RISC-V `nop` | one operand, `o_imm` | no operands |
 | PowerPC `mflr r0` | two operands, the second `o_idpspec0` | one operand |
 | x86-64 `mul rcx` | two operands, implicit `rax` first | one operand, tagged as operand 2 |
-
-The parser is checked against every line of every function in Debian's busybox for amd64, i386, arm64, armel, armhf,
-mipsel, mips64el, powerpc, ppc64, ppc64el, riscv64, sparc64, s390x, m68k, sh4, hppa and alpha.
