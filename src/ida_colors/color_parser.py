@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cache
 
+from ida_colors._compat import assert_never
+
 # --------------------
 # Enums
 # --------------------
@@ -212,4 +214,4 @@ def tag_remove(node: Colors) -> str:
         case str():
             return node
         case _:
-            raise ValueError(f'Unknown node: {node}')
+            assert_never(node)

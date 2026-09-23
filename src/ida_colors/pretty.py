@@ -1,5 +1,6 @@
 import json
 
+from ida_colors._compat import assert_never
 from ida_colors.color_parser import ColorAddr, ColorNode, Colors, ColorTag
 
 
@@ -35,4 +36,4 @@ def format_node(node: Colors) -> str:
         case str():
             return json.dumps(node)
         case _:
-            raise ValueError(f'Unknown node: {node}')
+            assert_never(node)
