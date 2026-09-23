@@ -6,7 +6,6 @@ from collections.abc import Iterable
 
 import idapro  # isort: skip
 import ida_auto
-import ida_funcs
 import ida_lines
 import ida_name
 import idautils
@@ -97,11 +96,6 @@ def main(idb_path: str) -> None:
 
     for func_ea in idautils.Functions():
         print(f'{func_ea:08X}: ', end='')
-
-        funk = ida_funcs.get_func(func_ea)
-        if not funk:
-            print('no function :(')
-            continue
 
         name = ida_name.get_name(func_ea)
         if not name:
