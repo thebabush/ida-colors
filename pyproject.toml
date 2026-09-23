@@ -11,7 +11,18 @@ dependencies = [
 [dependency-groups]
 dev = [
     "idapro>=0.0.4",
-    "mypy>=1.16.1",
     "pytest>=8.4.2",
     "ruff>=0.14.1",
+    "ty>=0.0.83",
 ]
+
+[tool.ty.rules]
+# Roughly mypy's `strict`: turn on the checks ty leaves off by default.
+division-by-zero = "error"
+missing-type-argument = "error"
+possibly-missing-attribute = "error"
+possibly-missing-import = "error"
+possibly-unresolved-reference = "error"
+
+[tool.ty.terminal]
+error-on-warning = true
