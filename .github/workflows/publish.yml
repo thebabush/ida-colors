@@ -1,0 +1,66 @@
+name: Publish
+
+# Manual release: optionally bump the version, tag it, publish to PyPI and create a GitHub release.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump before releasing (none publishes the current version)
+        type: choice
+        options: [patch, minor, major, none]
+        default: patch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Release to PyPI
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    # Must match the environment in the PyPI trusted publisher settings.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/ida-colors
+    permissions:
+      contents: write # push the release commit and tag, create the GitHub release
+      id-token: write # PyPI trusted publishing
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: uv sync --locked
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run ty check
+      - run: uv run pytest
+
+      - name: Bump the version
+        if: inputs.bump != 'none'
+        run: uv version --bump ${{ inputs.bump }}
+
+      - name: Commit and tag the release
+        run: |
+          version="$(uv version --short)"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898299+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --quiet; then
+            git commit -am "Release v$version"
+          fi
+          # A rerun after a failed publish finds the tag already there.
+          if ! git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            git tag "v$version"
+          fi
+          git push --atomic origin HEAD:master "v$version"
+
+      - run: uv build
+      - run: uv publish --trusted-publishing always
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$VERSION" dist/* --title "v$VERSION" --generate-notes
