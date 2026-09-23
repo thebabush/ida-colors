@@ -1,18 +1,35 @@
-__pycache__
-ignore/
-.DS_Store
-docs/
-data/
-*.hexlic
-storage
-.aider*
-sql/
-*.prof
-error.log
-log.txt
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtualenv and local config
+.venv/
 .env
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editors and OS
 .idea/
-binaries/
-*.run
-*.tar
-*.zip
+.vscode/
+.DS_Store
+
+# IDA side files created next to a database opened with idalib
+*.id0
+*.id1
+*.id2
+*.nam
+*.til
+*.$$$
+
+# IDA license files, never commit these
+*.hexlic

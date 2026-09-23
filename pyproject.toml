@@ -15,6 +15,11 @@ ida = ["idapro>=0.0.4"]
 [project.scripts]
 ida-colors = "ida_colors.__main__:cli"
 
+[project.urls]
+Homepage = "https://github.com/thebabush/ida-colors"
+Repository = "https://github.com/thebabush/ida-colors"
+Issues = "https://github.com/thebabush/ida-colors/issues"
+
 [dependency-groups]
 dev = [
     # Also ships the ida_* stubs ty uses. IDA-backed tests skip without an IDA install.
