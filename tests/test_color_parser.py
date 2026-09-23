@@ -1,76 +1,50 @@
-import json
-from typing import Any
-
 import pytest
-from pydantic import BaseModel
 
 from ida_colors.color_parser import (
     ColorAddr,
     ColorNode,
-    Colors,
     ColorTag,
     ParseError,
+    UnknownColorError,
     parse_colored_string,
     parse_full,
-    simplify_color_tree,
     tag_remove,
 )
 
 
-def parse_lift(s: str) -> Colors:
-    tree = parse_colored_string(s)
-    print(tree)
-    return tree
-
-
-def dump_with_types(obj: Any) -> Any:
-    if isinstance(obj, BaseModel):
-        cls = obj.__class__
-        result = {'_': cls.__name__}
-        for field in obj.__class__.model_fields:
-            if field == 'color' and getattr(obj, 'color', None) is not None:
-                color_val = obj.color
-                result[field] = ColorTag.from_int(color_val).name
-            else:
-                result[field] = dump_with_types(getattr(obj, field))
-        return result
-
-    elif isinstance(obj, list):
-        return [dump_with_types(item) for item in obj]
-
-    elif isinstance(obj, dict):
-        return {k: dump_with_types(v) for k, v in obj.items()}
-
-    else:
-        return obj  # base types (str, int, etc.)
-
-
-def test_parse_colored_string_easy() -> None:
+def test_parse_keeps_colorless_root() -> None:
     raw = '\x01)\x01!rsp\x02!\x02)'
-    parse_lift(raw)
+    assert parse_colored_string(raw) == ColorNode(
+        color=None,
+        content=[ColorNode(color=41, content=[ColorNode(color=33, content=['rsp'])])],
+    )
 
 
-def test_parse_colored_string_addr() -> None:
+def test_parse_full_unwraps_root() -> None:
+    raw = '\x01)\x01!rsp\x02!\x02)'
+    assert parse_full(raw) == ColorNode(color=41, content=[ColorNode(color=33, content=['rsp'])])
+
+
+def test_parse_full_keeps_root_with_several_children() -> None:
+    raw = '\x01\x05nop\x02\x05 x'
+    assert parse_full(raw) == ColorNode(color=None, content=[ColorNode(color=5, content=['nop']), ' x'])
+
+
+def test_addr() -> None:
     raw = '\x01)\x01!cs\x02!\x01\t:\x02\t\x01\x06\x01(00000000008604D8off_8604D8\x02\x06\x02)'
-    tree = parse_lift(raw)
-    tree = simplify_color_tree(tree)
-    print(json.dumps(dump_with_types(tree), indent=2))
-    target = ColorNode(
+    assert parse_full(raw) == ColorNode(
         color=41,
         content=[
             ColorNode(color=33, content=['cs']),
             ColorNode(color=9, content=[':']),
-            ColorNode(color=6, content=[ColorAddr(addr=8783064, text='off_8604D8')]),
+            ColorNode(color=6, content=[ColorAddr(addr=0x8604D8, text='off_8604D8')]),
         ],
     )
-    assert tree == target
 
 
-def test_parse_colored_byte_ptr() -> None:
+def test_byte_ptr() -> None:
     raw = '\x01)\x01 byte ptr\x02  \x01\t[\x02\t\x01!rbp\x02!\x01\t+\x02\t\x01\x0c1\x02\x0c\x01\t]\x02\t\x02)'
-    colors = parse_lift(raw)
-    colors = simplify_color_tree(colors)
-    target = ColorNode(
+    assert parse_full(raw) == ColorNode(
         color=41,
         content=[
             ColorNode(color=32, content=['byte ptr']),
@@ -82,7 +56,7 @@ def test_parse_colored_byte_ptr() -> None:
             ColorNode(color=9, content=[']']),
         ],
     )
-    assert colors == target
+    assert tag_remove(parse_full(raw)) == 'byte ptr [rbp+1]'
 
 
 def test_stray_color_off_is_skipped() -> None:
@@ -122,8 +96,31 @@ def test_addr_text_stops_at_escape() -> None:
         ('\x01(0123', ParseError),  # truncated address
         ('\x01(zzzzzzzzzzzzzzzz', ParseError),  # non-hex address
         ('a\x04b', NotImplementedError),  # COLOR_INV
+        ('\x01\x05\x01\x06a\x02\x05\x02\x06', ParseError),  # crossed tags: OFF 5 is skipped, so 5 stays open
     ],
 )
 def test_errors(raw: str, error: type[Exception]) -> None:
     with pytest.raises(error):
         parse_colored_string(raw)
+
+
+# Known bug: int(x, 16) accepts more than hex digits, so these parse instead of raising ParseError.
+@pytest.mark.xfail(strict=True, reason='address is parsed with int(x, 16), which accepts non-hex syntax')
+@pytest.mark.parametrize(
+    'raw',
+    [
+        '\x01(0000_00000001234',  # underscore
+        '\x01( 000000000001234',  # whitespace
+        '\x01(-000000000001234',  # sign, even parses as a negative address
+        '\x01(0x00000000001234',  # 0x prefix
+    ],
+)
+def test_non_hex_address_is_rejected(raw: str) -> None:
+    with pytest.raises(ParseError):
+        parse_colored_string(raw)
+
+
+def test_unknown_color_tag() -> None:
+    assert ColorTag.from_int(33) is ColorTag.REG
+    with pytest.raises(UnknownColorError, match='0x31'):
+        ColorTag.from_int(0x31)
