@@ -20,3 +20,16 @@ def test_pp_single_colored_node() -> None:
 
 def test_pp_empty_line() -> None:
     assert list(cli.pp(parse_full(''))) == []
+
+
+def test_check_roundtrip_passes() -> None:
+    raw = '\x01\x05mov\x02\x05     \x01)\x01!rax\x02!\x02)\x01\t,\x02\t \x01*\x01!rbx\x02!\x02*'
+    cli.check_roundtrip(0x1000, cli.ida_lines.tag_remove(raw), parse_full(raw))
+
+
+def test_check_roundtrip_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = '\x01\x05nop\x02\x05'
+    # Make the parser's side disagree with IDA's.
+    monkeypatch.setattr(cli.color_parser, 'tag_remove', lambda _colors: 'nope')
+    with pytest.raises(cli.RoundtripError, match=r"00001000: .*'nop'.*'nope'"):
+        cli.check_roundtrip(0x1000, cli.ida_lines.tag_remove(raw), parse_full(raw))
