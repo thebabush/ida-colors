@@ -14,6 +14,13 @@ $ uv run ida-colors <path-to-idb>
 ...
 ```
 
+`--json` prints one JSON object per instruction instead, for scripts and agents (`--hex` makes addresses hex strings):
+
+```sh
+$ uv run ida-colors --json <path-to-idb>
+{"ea":"4294973168","func":"sub_1000016F0","text":"push    rbp","tree":[{"tag":"INSN","children":["push"]},"    ",{"tag":"OPND1","children":[{"tag":"REG","children":["rbp"]}]}]}
+```
+
 The CLI needs IDA 9+ and the `ida` extra (`idapro`). The parser itself has no dependencies.
 
 ## Development

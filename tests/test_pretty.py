@@ -1,5 +1,5 @@
-from ida_colors.color_parser import ColorAddr, ColorNode, ColorTag, parse_full
-from ida_colors.pretty import format_line, format_node
+from ida_colors.color_parser import ColorAddr, ColorNode, ColorTag, parse_colored_string, parse_full
+from ida_colors.pretty import format_line, format_node, to_json
 
 
 def test_format_line_instruction() -> None:
@@ -42,3 +42,40 @@ def test_format_node_string_is_json_quoted() -> None:
 def test_format_node_skips_whitespace_children() -> None:
     node = ColorNode(color=ColorTag.INSN.value, content=['  ', 'mov', '\t'])
     assert format_node(node) == 'Insn("mov")'
+
+
+def test_to_json_string() -> None:
+    assert to_json('mov') == 'mov'
+
+
+def test_to_json_nested() -> None:
+    node = ColorNode(color=ColorTag.OPND1.value, content=[ColorNode(color=ColorTag.REG.value, content=['rax']), 'x'])
+    assert to_json(node) == {'tag': 'OPND1', 'children': [{'tag': 'REG', 'children': ['rax']}, 'x']}
+
+
+def test_to_json_addr_decimal() -> None:
+    assert to_json(ColorAddr(addr=0x1234, text='name')) == {'addr': '4660', 'text': 'name'}
+
+
+def test_to_json_addr_hex() -> None:
+    assert to_json(ColorAddr(addr=0x1234, text='name'), hex_addrs=True) == {'addr': '0x1234', 'text': 'name'}
+
+
+def test_to_json_unknown_tag_is_int() -> None:
+    assert to_json(ColorNode(color=0x31, content=['a'])) == {'tag': 0x31, 'children': ['a']}
+
+
+def test_to_json_colorless() -> None:
+    assert to_json(ColorNode(color=None, content=['a'])) == {'tag': None, 'children': ['a']}
+
+
+def test_to_json_full_line() -> None:
+    raw = '\x01\x05mov\x02\x05     \x01)\x01!rax\x02!\x02)\x01\t,\x02\t \x01*\x01!rbx\x02!\x02*'
+    assert [to_json(c) for c in parse_colored_string(raw).content] == [
+        {'tag': 'INSN', 'children': ['mov']},
+        '     ',
+        {'tag': 'OPND1', 'children': [{'tag': 'REG', 'children': ['rax']}]},
+        {'tag': 'SYMBOL', 'children': [',']},
+        ' ',
+        {'tag': 'OPND2', 'children': [{'tag': 'REG', 'children': ['rbx']}]},
+    ]
