@@ -2,7 +2,6 @@ import argparse
 import atexit
 import json
 import sys
-from collections.abc import Iterable
 
 import idapro  # isort: skip
 import ida_auto
@@ -10,7 +9,7 @@ import ida_lines
 import ida_name
 import idautils
 
-from ida_colors import color_parser
+from ida_colors import color_parser, pretty
 
 
 class RoundtripError(Exception):
@@ -33,44 +32,9 @@ def process_insn(addr: int, strict: bool) -> None:
     if strict:
         check_roundtrip(addr, raw_asm, colors)
     print(f'    {json.dumps(raw_asm)}')
-    for line in pp(colors):
+    for line in pretty.format_line(colors):
         print(f'        {line}')
     print()
-
-
-def pp(colors: color_parser.Colors) -> Iterable[str]:
-    """Pretty print a colored string."""
-    # parse_full() unwraps a line that is a single colored node, e.g. a bare `nop`.
-    parts = colors.content if isinstance(colors, color_parser.ColorNode) and colors.color is None else [colors]
-    if not parts:
-        return
-    mnemonic, *operands = parts
-
-    yield ''.join(_pp(mnemonic))
-    for operand in operands:
-        match operand:
-            case str() if not operand.strip():
-                continue
-            case color_parser.ColorNode(color=ida_lines.COLOR_SYMBOL, content=[',']):
-                continue
-        yield ''.join(_pp(operand))
-
-
-def _pp(colors: color_parser.Colors) -> Iterable[str]:
-    """Pretty print a colored string."""
-    match colors:
-        case color_parser.ColorNode(color=color, content=content):
-            color_name = color_parser.ColorTag.from_int(color).name.title() if color is not None else '_'
-            # Skip whitespace-only strings
-            children = [''.join(_pp(c)) for c in content if not (isinstance(c, str) and not c.strip())]
-            yield f'{color_name}({", ".join(children)})'
-
-        case color_parser.ColorAddr(addr=addr, text=text):
-            yield f'Addr({addr:08X}, {text!r})'
-        case str():
-            yield f'{json.dumps(colors)}'
-        case _:
-            raise ValueError(f'Unknown node: {colors}')
 
 
 def main(idb_path: str, strict: bool) -> None:

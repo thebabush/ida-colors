@@ -201,20 +201,6 @@ def parse_full(s: str, address_size: AddressSize = AddressSize.BITS_64) -> Color
     return simplify_color_tree(parse_colored_string(s, address_size))
 
 
-def pp(node: Colors, indent: int = 0) -> str:
-    """Pretty print a colored string."""
-    match node:
-        case ColorNode(color=color, content=content):
-            color_name = ColorTag.from_int(color).name if color is not None else '_'
-            return f'{"  " * indent}{color_name}\n' + '\n'.join([pp(c, indent + 1) for c in content])
-        case ColorAddr(addr=addr, text=text):
-            return f'{"  " * indent}{addr:08X}: {text}'
-        case str():
-            return f'{"  " * indent}{node}'
-        case _:
-            raise ValueError(f'Unknown node: {node}')
-
-
 def tag_remove(node: Colors) -> str:
     """Remove all color tags from a colored string."""
     match node:
