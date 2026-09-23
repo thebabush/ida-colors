@@ -11,8 +11,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Needed by the `python -m ida_colors` CLI. The parser itself doesn't use IDA.
+# Needed by the `ida-colors` CLI. The parser itself doesn't use IDA.
 ida = ["idapro>=0.0.4"]
+
+[project.scripts]
+ida-colors = "ida_colors.__main__:cli"
 
 [dependency-groups]
 dev = [
@@ -22,6 +25,13 @@ dev = [
     "ruff>=0.16.8",
     "ty>=0.0.83",
 ]
+
+[build-system]
+requires = ["uv_build>=0.8.12,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
 
 [tool.ruff]
 line-length = 120
@@ -49,6 +59,3 @@ possibly-unresolved-reference = "error"
 
 [tool.ty.terminal]
 error-on-warning = true
-
-[tool.pytest.ini_options]
-pythonpath = ["."]

@@ -1,7 +1,7 @@
+import argparse
 import atexit
 import codecs
 import json
-import sys
 from collections.abc import Iterable
 
 import idapro  # isort: skip
@@ -108,5 +108,11 @@ def main(idb_path: str) -> None:
                 process_insn(addr)
 
 
+def cli() -> None:
+    parser = argparse.ArgumentParser(prog='ida-colors', description='Dump the parsed color tags of every instruction.')
+    parser.add_argument('idb_path', help='IDA database (or binary) to open')
+    main(parser.parse_args().idb_path)
+
+
 if __name__ == '__main__':
-    main(*sys.argv[1:])
+    cli()

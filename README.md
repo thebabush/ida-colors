@@ -5,7 +5,7 @@ Parser for color tags in IDA.
 ## Usage
 
 ```sh
-$ uv run python -m ida_colors <path-to-idb>
+$ uv run ida-colors <path-to-idb>
 ...
     "LDR             X8, [X19,#0x10]"
         Insn("LDR")

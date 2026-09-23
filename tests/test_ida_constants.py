@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-# Import before idapro: initializing IDA rewrites sys.path, dropping the repo root.
 from ida_colors.color_parser import AddressSize, ColorTag, ControlChar
 
 # idapro raises a plain ImportError when it can't find an IDA install.
