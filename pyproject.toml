@@ -8,8 +8,13 @@ dependencies = [
     "pydantic>=2.11.7",
 ]
 
+[project.optional-dependencies]
+# Needed by the `python -m ida_colors` CLI. The parser itself doesn't use IDA.
+ida = ["idapro>=0.0.4"]
+
 [dependency-groups]
 dev = [
+    # Also ships the ida_* stubs ty uses. IDA-backed tests skip without an IDA install.
     "idapro>=0.0.4",
     "pytest>=8.4.2",
     "ruff>=0.16.8",
