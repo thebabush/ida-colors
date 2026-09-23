@@ -1,5 +1,7 @@
 # IDA Colors
 
+[![CI](https://github.com/thebabush/ida-colors/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/thebabush/ida-colors/actions/workflows/ci.yml?query=branch%3Amaster)
+
 Parser for color tags in IDA.
 
 ## Usage
