@@ -59,3 +59,10 @@ possibly-unresolved-reference = "error"
 
 [tool.ty.terminal]
 error-on-warning = true
+
+[tool.pyright]
+# Only for Pylance in editors. ty is the type checker that CI runs.
+venvPath = "."
+venv = ".venv"
+# The ida_* stubs ship with idapro, but their .py sources only exist inside an IDA install.
+reportMissingModuleSource = "none"
