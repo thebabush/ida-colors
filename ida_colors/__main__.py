@@ -36,10 +36,11 @@ def process_insn(addr: int) -> None:
 
 def pp(colors: color_parser.Colors) -> Iterable[str]:
     """Pretty print a colored string."""
-    assert isinstance(colors, color_parser.ColorNode)
-    mnemonic, *operands = colors.content
-    if operands:
-        assert colors.color is None
+    # parse_full() unwraps a line that is a single colored node, e.g. a bare `nop`.
+    parts = colors.content if isinstance(colors, color_parser.ColorNode) and colors.color is None else [colors]
+    if not parts:
+        return
+    mnemonic, *operands = parts
 
     yield ''.join(_pp(mnemonic))
     for operand in operands:

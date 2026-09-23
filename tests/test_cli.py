@@ -14,13 +14,9 @@ def test_pp_instruction() -> None:
     assert list(cli.pp(parse_full(raw))) == ['Insn("mov")', 'Opnd1(Reg("rax"))', 'Opnd2(Reg("rbx"))']
 
 
-# Known bug: a line that is one colored node simplifies to that node, and pp() then prints its child only.
-@pytest.mark.xfail(strict=True, reason='pp() unpacks the node it gets instead of printing it')
 def test_pp_single_colored_node() -> None:
     assert list(cli.pp(parse_full('\x01\x05nop\x02\x05'))) == ['Insn("nop")']
 
 
-# Known bug: pp() unpacks the first child as the mnemonic, which fails on an empty line.
-@pytest.mark.xfail(strict=True, raises=ValueError, reason='pp() assumes at least one child')
 def test_pp_empty_line() -> None:
     assert list(cli.pp(parse_full(''))) == []
