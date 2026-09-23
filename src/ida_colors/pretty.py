@@ -3,7 +3,7 @@ from typing import Any
 
 from ida_colors.color_parser import ColorAddr, ColorNode, Colors, ColorTag, UnknownColorError
 
-# A node mapped by to_json(): a string, or a dict for a ColorNode or ColorAddr.
+# An item from to_json_items(): a string, or a single-key dict for a ColorNode or a ColorAddr's address.
 JsonNode = str | dict[str, Any]
 
 
@@ -47,23 +47,28 @@ def format_addr(addr: int, hex_addrs: bool = False) -> str:
     return hex(addr) if hex_addrs else str(addr)
 
 
-def to_json(node: Colors, hex_addrs: bool = False) -> JsonNode:
-    """Map a node to a JSON-able value, e.g. `{"tag": "REG", "children": ["rax"]}`."""
+def to_json_items(node: Colors, hex_addrs: bool = False) -> list[JsonNode]:
+    """Map a node to the JSON-able items it contributes to its parent's list, e.g. `[{"REG": ["rax"]}]`.
+
+    A ColorAddr gives two items, `{"ADDR": addr}` then its text (if any), like the raw address mark does.
+    """
     match node:
         case ColorNode(color=color, content=content):
-            tag: str | int | None
             if color is None:
-                tag = None
+                tag = '_'
             else:
                 # Newer IDA versions add tags, so keep an unknown one as its number.
                 try:
                     tag = ColorTag.from_int(color).name
                 except UnknownColorError:
-                    tag = color
-            return {'tag': tag, 'children': [to_json(c, hex_addrs) for c in content]}
+                    tag = str(color)
+            return [{tag: [item for c in content for item in to_json_items(c, hex_addrs)]}]
         case ColorAddr(addr=addr, text=text):
-            return {'addr': format_addr(addr, hex_addrs), 'text': text}
+            items: list[JsonNode] = [{'ADDR': format_addr(addr, hex_addrs)}]
+            if text:
+                items.append(text)
+            return items
         case str():
-            return node
+            return [node]
         case _:
             raise ValueError(f'Unknown node: {node}')

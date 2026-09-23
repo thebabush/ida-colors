@@ -37,7 +37,7 @@ def process_insn(addr: int, strict: bool) -> None:
     print()
 
 
-def process_insn_json(addr: int, func_name: str, strict: bool, hex_addrs: bool) -> None:
+def process_insn_json(addr: int, func_ea: int, func_name: str, strict: bool, hex_addrs: bool) -> None:
     """Print one instruction as a compact JSON object on its own line."""
     asm = ida_lines.generate_disasm_line(addr)
     raw_asm = ida_lines.tag_remove(asm)
@@ -47,9 +47,11 @@ def process_insn_json(addr: int, func_name: str, strict: bool, hex_addrs: bool) 
         check_roundtrip(addr, raw_asm, root)
     record = {
         'ea': pretty.format_addr(addr, hex_addrs),
+        'func_ea': pretty.format_addr(func_ea, hex_addrs),
         'func': func_name,
+        'tagged': asm,
         'text': raw_asm,
-        'tree': [pretty.to_json(c, hex_addrs) for c in root.content],
+        'tree': [item for c in root.content for item in pretty.to_json_items(c, hex_addrs)],
     }
     print(json.dumps(record, separators=(',', ':')))
 
@@ -71,7 +73,7 @@ def main(idb_path: str, strict: bool, as_json: bool, hex_addrs: bool) -> None:
         for chunk_beg, chunk_end in idautils.Chunks(func_ea):
             for addr in idautils.Heads(chunk_beg, chunk_end):
                 if as_json:
-                    process_insn_json(addr, name, strict, hex_addrs)
+                    process_insn_json(addr, func_ea, name, strict, hex_addrs)
                 else:
                     process_insn(addr, strict)
 

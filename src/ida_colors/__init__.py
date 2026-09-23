@@ -14,7 +14,7 @@ from ida_colors.color_parser import (
     simplify_color_tree,
     tag_remove,
 )
-from ida_colors.pretty import JsonNode, format_addr, format_line, format_node, to_json
+from ida_colors.pretty import JsonNode, format_addr, format_line, format_node, to_json_items
 
 __all__ = [
     'AddressSize',
@@ -33,5 +33,5 @@ __all__ = [
     'parse_full',
     'simplify_color_tree',
     'tag_remove',
-    'to_json',
+    'to_json_items',
 ]
