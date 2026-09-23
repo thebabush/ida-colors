@@ -83,15 +83,15 @@ class ColorTag(Enum):
     """IDA Pro color tag constants."""
 
     DEFAULT = 1
-    SELECTED = 2
+    REGCMT = 2
     RPTCMT = 3
-    REGFUNC = 4
+    AUTOCMT = 4
     INSN = 5
     DATNAME = 6
-    UNKNOWN = 7
-    EXTERN = 8
+    DNAME = 7
+    DEMNAME = 8
     SYMBOL = 9
-    CURLINE = 10
+    CHAR = 10
     STRING = 11
     NUMBER = 12
     VOIDOP = 13
@@ -132,6 +132,8 @@ class ColorTag(Enum):
     OPND8 = 48
     RESERVED1 = 51
     LUMINA = 52
+    ADDR_EXPR = 53
+    GROUP = 54
 
     @classmethod
     def from_int(cls, value: int) -> 'ColorTag':
