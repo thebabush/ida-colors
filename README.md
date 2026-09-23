@@ -14,7 +14,7 @@ $ uv run ida-colors <path-to-idb>
 ...
 ```
 
-The CLI needs IDA 9+ and the `ida` extra (`idapro`). The parser itself has no IDA dependency.
+The CLI needs IDA 9+ and the `ida` extra (`idapro`). The parser itself has no dependencies.
 
 ## Development
 

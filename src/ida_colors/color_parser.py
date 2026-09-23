@@ -1,10 +1,9 @@
 import re
 import string
 from collections.abc import Sequence
+from dataclasses import dataclass
 from enum import Enum
 from functools import cache
-
-from pydantic import BaseModel
 
 # --------------------
 # Enums
@@ -28,12 +27,14 @@ class AddressSize(Enum):
     BITS_64 = 16
 
 
-class ColorNode(BaseModel):
+@dataclass(slots=True)
+class ColorNode:
     color: int | None
     content: Sequence['Colors']
 
 
-class ColorAddr(BaseModel):
+@dataclass(slots=True)
+class ColorAddr:
     addr: int
     text: str
 
