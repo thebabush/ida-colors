@@ -104,14 +104,12 @@ def test_errors(raw: str, error: type[Exception]) -> None:
         parse_colored_string(raw)
 
 
-# Known bug: int(x, 16) accepts more than hex digits, so these parse instead of raising ParseError.
-@pytest.mark.xfail(strict=True, reason='address is parsed with int(x, 16), which accepts non-hex syntax')
 @pytest.mark.parametrize(
     'raw',
     [
         '\x01(0000_00000001234',  # underscore
         '\x01( 000000000001234',  # whitespace
-        '\x01(-000000000001234',  # sign, even parses as a negative address
+        '\x01(-000000000001234',  # sign, used to parse as a negative address
         '\x01(0x00000000001234',  # 0x prefix
     ],
 )

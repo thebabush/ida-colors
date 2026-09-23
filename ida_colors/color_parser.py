@@ -1,4 +1,5 @@
 import re
+import string
 from collections.abc import Sequence
 from enum import Enum
 from functools import cache
@@ -124,6 +125,9 @@ class ParseError(Exception):
     """Error during parsing."""
 
 
+_HEX_DIGITS = frozenset(string.hexdigits)
+
+
 @cache
 def _tokenizer(address_size: AddressSize) -> re.Pattern[str]:
     # One token per match. Address text stops at any control char. Plain text runs through escapes (ESC + any char).
@@ -144,13 +148,12 @@ def parse_colored_string(s: str, address_size: AddressSize = AddressSize.BITS_64
     for m in _tokenizer(address_size).finditer(s):
         content = stack[-1][1]
         if m['addr'] is not None:
-            if m['hex'] is None:
+            if (addr_hex := m['hex']) is None:
                 raise ParseError('Unexpected end of input')
-            try:
-                addr = int(m['hex'], 16)
-            except ValueError:
-                raise ParseError(f'Invalid hex address: {m["hex"]}') from None
-            content.append(ColorAddr(addr=addr, text=m['addr_text']))
+            # Checked by hand because int(x, 16) also takes signs, whitespace, underscores and a 0x prefix.
+            if not _HEX_DIGITS.issuperset(addr_hex):
+                raise ParseError(f'Invalid hex address: {addr_hex}')
+            content.append(ColorAddr(addr=int(addr_hex, 16), text=m['addr_text']))
         elif (on := m['on']) is not None:
             stack.append((ord(on), []))
         elif (off := m['off']) is not None:
