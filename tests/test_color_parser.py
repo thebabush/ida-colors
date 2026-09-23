@@ -25,7 +25,7 @@ def dump_with_types(obj: Any) -> Any:
         result = {'_': cls.__name__}
         for field in obj.__class__.model_fields:
             if field == 'color' and getattr(obj, 'color', None) is not None:
-                color_val = getattr(obj, 'color')
+                color_val = obj.color
                 result[field] = ColorTag.from_int(color_val).name
             else:
                 result[field] = dump_with_types(getattr(obj, field))

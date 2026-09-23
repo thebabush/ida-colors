@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from enum import Enum
-from typing import NewType, Optional, Sequence
+from typing import NewType
 
 from pydantic import BaseModel
 
@@ -38,7 +39,7 @@ class ColorAstBaseModel(BaseModel):
 
 
 class ColorToken(ColorAstBaseModel):
-    color: Optional[str]
+    color: str | None
     text: str
 
 
@@ -59,13 +60,9 @@ class ColorOnOff(ColorAstBaseModel):
 class ColorOn(ColorOnOff):
     """Intermediate class for color_on_tag."""
 
-    pass
-
 
 class ColorOff(ColorOnOff):
     """Intermediate class for color_off_tag."""
-
-    pass
 
 
 Colors = ColorNode | str | ColorAddr
@@ -141,7 +138,7 @@ class ColorTag(Enum):
         try:
             return cls(value)
         except ValueError:
-            raise UnknownColorError(value)
+            raise UnknownColorError(value) from None
 
 
 # --------------------
@@ -151,8 +148,6 @@ class ColorTag(Enum):
 
 class ParseError(Exception):
     """Error during parsing."""
-
-    pass
 
 
 class ColorStringParser:
@@ -246,10 +241,7 @@ class ColorStringParser:
     def parse_color_addr(self) -> ColorAddr:
         """Parse a color address: COLOR_ON COLOR_ADDR addr_bytes text."""
         # Consume COLOR_ON and COLOR_ADDR
-        if (
-            self.consume() != ControlChar.COLOR_ON.value
-            or self.consume() != ControlChar.COLOR_ADDR.value
-        ):
+        if self.consume() != ControlChar.COLOR_ON.value or self.consume() != ControlChar.COLOR_ADDR.value:
             raise ParseError('Expected COLOR_ON COLOR_ADDR')
 
         # Parse address bytes (hex string)
@@ -257,7 +249,7 @@ class ColorStringParser:
         try:
             addr = int(addr_hex, 16)
         except ValueError:
-            raise ParseError(f'Invalid hex address: {addr_hex}')
+            raise ParseError(f'Invalid hex address: {addr_hex}') from None
 
         # Parse text until COLOR_OFF or another control character
         text = self.parse_addr_text()
@@ -376,9 +368,7 @@ def pp(node: Colors, indent: int = 0, level: int = 0) -> str:
             else:
                 color_name = '_'
 
-            return f'{"  " * indent}{color_name}\n' + '\n'.join(
-                [pp(c, indent + 1, level + 1) for c in content]
-            )
+            return f'{"  " * indent}{color_name}\n' + '\n'.join([pp(c, indent + 1, level + 1) for c in content])
         case ColorAddr(addr=addr, text=text):
             return f'{"  " * indent}{addr:08X}: {text}'
         case str():

@@ -2,9 +2,9 @@ import atexit
 import codecs
 import json
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
-import idapro  # noqa: F401 # isort: skip
+import idapro  # isort: skip
 import ida_auto
 import ida_funcs
 import ida_lines
@@ -83,7 +83,7 @@ def _pp(colors: color_parser.Colors) -> Iterable[str]:
             yield ')'
 
         case color_parser.ColorAddr(addr=addr, text=text):
-            yield f'Addr({addr:08X}, {repr(text)})'
+            yield f'Addr({addr:08X}, {text!r})'
         case str():
             yield f'{json.dumps(colors)}'
         case _:
