@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 from ida_colors.color_parser import ColorAddr, Colors, ColorTag, iter_nodes
 
+_AUTOCMT = ColorTag.AUTOCMT.value
+
 # `; ` on most processors, `# ` on PowerPC, RISC-V and s390x, ` # ` on MIPS.
 _PREFIX = re.compile(r' ?[;#] ')
 
@@ -46,6 +48,6 @@ def strings(tree: Colors) -> list[String]:
     """Return the strings and chars in a line's automatic comments, in order. Other comment text is skipped."""
     out: list[String] = []
     for node in iter_nodes(tree):
-        if node.color == ColorTag.AUTOCMT.value:
+        if node.color == _AUTOCMT:
             _autocmt(node.content, out)
     return out

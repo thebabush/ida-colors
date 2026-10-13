@@ -43,6 +43,10 @@ ignore = [
     "ANN401",  # explicit `Any` is allowed, as in mypy strict
 ]
 
+[tool.ruff.lint.isort]
+# The frozen copy that tests/test_oracle.py compares against.
+known-first-party = ['ida_colors_ref']
+
 [tool.ruff.lint.flake8-annotations]
 mypy-init-return = true
 

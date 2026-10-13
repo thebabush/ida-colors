@@ -64,6 +64,13 @@ skipped when `idapro` can't load one. `tests/test_ida_numbers.py` checks parsed 
 on every `.i64` in `$IDA_COLORS_IDBS` (opened as temporary copies), and `tests/test_ida_strings.py` checks parsed
 strings against the string literals there. Both are skipped when it's unset.
 
+`uv run python bench/bench.py` times `parse_full()`, `numbers()` and `strings()` per line on the sample of real
+disassembly in `tests/data/lines.json`, by processor. It's not part of CI, as timings on shared runners are too noisy.
+
+`tests/test_oracle.py` checks that trees, results and errors match `tests/ida_colors_ref`, a frozen copy of the
+package, on those lines and on mangled versions of them. Speedups must keep it passing. A deliberate behavior change
+replaces the copy with the new code.
+
 ## Why?
 
 IDA's disassembly isn't just the decoded instruction. Between `decode_insn` and the line you see, the processor module's

@@ -10,6 +10,7 @@ from ida_colors.color_parser import ColorNode, Colors, ColorTag, tag_remove
 # a digit (IDA adds a 0 when it would start with a letter, otherwise it reads as a name).
 _INT = re.compile(r'(?P<dec>0|[1-9][0-9]*)|0x(?P<hex>[0-9A-Fa-f]+)|(?P<hex_h>[0-9][0-9A-Fa-f]*)h')
 
+_SYMBOL = ColorTag.SYMBOL.value
 _NUMBER_TAGS = frozenset({ColorTag.NUMBER.value, ColorTag.DNUM.value})
 _OPERAND_TAGS = {tag.value: int(tag.name[4:]) for tag in ColorTag if tag.name.startswith('OPND')}
 
@@ -73,7 +74,7 @@ class Number:
 
 
 def _is_symbol(node: Colors) -> bool:
-    return isinstance(node, ColorNode) and node.color == ColorTag.SYMBOL.value
+    return isinstance(node, ColorNode) and node.color == _SYMBOL
 
 
 def _is_blank(node: Colors) -> bool:

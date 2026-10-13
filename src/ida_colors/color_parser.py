@@ -153,7 +153,24 @@ def parse_colored_string(s: str, address_size: AddressSize = AddressSize.BITS_64
     stack: list[tuple[int | None, list[Colors]]] = [(None, [])]
     for m in _tokenizer(address_size).finditer(s):
         content = stack[-1][1]
-        if m['addr'] is not None:
+        # The common tokens come first. Only one alternative of the tokenizer matches each time.
+        if (on := m['on']) is not None:
+            stack.append((ord(on), []))
+        elif (off := m['off']) is not None:
+            # IDA sometimes emits an OFF with no matching ON (e.g. `__unwind {` comments). Skip it like tag_remove does.
+            if len(stack) > 1 and stack[-1][0] == ord(off):
+                color, children = stack.pop()
+                stack[-1][1].append(ColorNode(color=color, content=children))
+        elif (text := m['text']) is not None:
+            # Escapes are rare, so skip the substitution when there are none.
+            if '\x03' in text:
+                text = re.sub(r'\x03(.?)', r'\1', text, flags=re.DOTALL)
+            # Text on both sides of a skipped OFF or INV joins into one string.
+            if content and isinstance(content[-1], str):
+                content[-1] += text
+            elif text:
+                content.append(text)
+        elif m['addr'] is not None:
             if (addr_hex := m['hex']) is None:
                 raise ParseError('Unexpected end of input')
             # Checked by hand because int(x, 16) also takes signs, whitespace, underscores and a 0x prefix.
@@ -165,20 +182,6 @@ def parse_colored_string(s: str, address_size: AddressSize = AddressSize.BITS_64
             if m['sem_header'] is None:
                 raise ParseError('Unexpected end of input')
             stack.append((ColorTag.SEMSPAN.value, []))
-        elif (on := m['on']) is not None:
-            stack.append((ord(on), []))
-        elif (off := m['off']) is not None:
-            # IDA sometimes emits an OFF with no matching ON (e.g. `__unwind {` comments). Skip it like tag_remove does.
-            if len(stack) > 1 and stack[-1][0] == ord(off):
-                color, children = stack.pop()
-                stack[-1][1].append(ColorNode(color=color, content=children))
-        elif (text := m['text']) is not None:
-            text = re.sub(r'\x03(.?)', r'\1', text, flags=re.DOTALL)
-            # Text on both sides of a skipped OFF or INV joins into one string.
-            if content and isinstance(content[-1], str):
-                content[-1] += text
-            elif text:
-                content.append(text)
         elif m['bad'] == chr(ControlChar.COLOR_INV.value):
             # A lone invisible byte with no tag or payload, e.g. two before a Hex-Rays `}`. Skip it like tag_remove.
             continue
@@ -219,12 +222,9 @@ def tag_remove(node: Colors) -> str:
 
 def iter_nodes(node: Colors) -> Iterator[ColorNode]:
     """Yield every colored node, the tree itself included, top-down in the order they're printed."""
-    match node:
-        case ColorNode(content=content):
-            yield node
-            for child in content:
-                yield from iter_nodes(child)
-        case ColorAddr() | str():
-            pass
-        case _:
-            assert_never(node)
+    # A stack instead of recursion, which would resume a generator per level for every node.
+    stack = [node] if isinstance(node, ColorNode) else []
+    while stack:
+        current = stack.pop()
+        yield current
+        stack.extend([child for child in reversed(current.content) if isinstance(child, ColorNode)])
