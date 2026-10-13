@@ -1,9 +1,7 @@
-import re
 import string
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from functools import cache
 
 from ida_colors._compat import assert_never
 
@@ -131,62 +129,82 @@ class ParseError(Exception):
 
 _HEX_DIGITS = frozenset(string.hexdigits)
 
+_ON = chr(ControlChar.COLOR_ON.value)
+_OFF = chr(ControlChar.COLOR_OFF.value)
+_ESC = chr(ControlChar.COLOR_ESC.value)
+_INV = chr(ControlChar.COLOR_INV.value)
+_ADDR = chr(ControlChar.COLOR_ADDR.value)
+_SEMSPAN = chr(ColorTag.SEMSPAN.value)
+_CONTROL = frozenset((_ON, _OFF, _ESC, _INV))
 
-@cache
-def _tokenizer(address_size: AddressSize) -> re.Pattern[str]:
-    # One token per match. Address text stops at any control char. Plain text runs through escapes (ESC + any char).
-    # A SEMSPAN header is one kind byte, plus a tid payload as long as an address for SEMK_LOCAL_TYPE_BY_TID (3).
-    return re.compile(
-        rf'(?P<addr>\x01\x28)(?:(?P<hex>.{{{address_size.value}}})(?P<addr_text>[^\x01-\x04]*))?'
-        rf'|(?P<semspan>\x01\x36)(?P<sem_header>\x03.{{{address_size.value}}}|[^\x03])?'
-        r'|\x01(?P<on>.)'
-        r'|\x02(?P<off>.)'
-        r'|(?P<text>(?:[^\x01-\x04]|\x03.?)+)'
-        r'|(?P<bad>.)',
-        re.DOTALL,
-    )
+
+def _text_end(s: str, i: int) -> int:
+    # A char at a time beats a regex here: IDA's text runs are a few chars long, and a match object per run costs more.
+    n = len(s)
+    while i < n and s[i] not in _CONTROL:
+        i += 1
+    return i
 
 
 def parse_colored_string(s: str, address_size: AddressSize = AddressSize.BITS_64) -> ColorNode:
     """Parse colored string."""
+    size = address_size.value
+    n = len(s)
     # Stack of open tags and their content. The bottom entry is the colorless root.
     stack: list[tuple[int | None, list[Colors]]] = [(None, [])]
-    for m in _tokenizer(address_size).finditer(s):
+    i = 0
+    while i < n:
+        c = s[i]
         content = stack[-1][1]
-        # The common tokens come first. Only one alternative of the tokenizer matches each time.
-        if (on := m['on']) is not None:
-            stack.append((ord(on), []))
-        elif (off := m['off']) is not None:
+        if c == _ON:
+            if i + 1 == n:
+                raise ParseError('Unexpected end of input')
+            tag = s[i + 1]
+            if tag == _ADDR:
+                # The address is as many hex digits as address_size, then its text up to the next control char.
+                addr_hex = s[i + 2 : i + 2 + size]
+                if len(addr_hex) < size:
+                    raise ParseError('Unexpected end of input')
+                # Checked by hand because int(x, 16) also takes signs, whitespace, underscores and a 0x prefix.
+                if not _HEX_DIGITS.issuperset(addr_hex):
+                    raise ParseError(f'Invalid hex address: {addr_hex}')
+                end = _text_end(s, i + 2 + size)
+                content.append(ColorAddr(addr=int(addr_hex, 16), text=s[i + 2 + size : end]))
+                i = end
+            elif tag == _SEMSPAN:
+                # The header is dropped like tag_remove does. The span is an ordinary tag 54 node. The header is one
+                # kind byte, plus an escaped tid payload as long as an address for SEMK_LOCAL_TYPE_BY_TID (3).
+                if i + 2 == n or (s[i + 2] == _ESC and i + 3 + size > n):
+                    raise ParseError('Unexpected end of input')
+                i += 3 + size if s[i + 2] == _ESC else 3
+                stack.append((ColorTag.SEMSPAN.value, []))
+            else:
+                stack.append((ord(tag), []))
+                i += 2
+        elif c == _OFF:
+            if i + 1 == n:
+                raise ParseError('Unexpected end of input')
             # IDA sometimes emits an OFF with no matching ON (e.g. `__unwind {` comments). Skip it like tag_remove does.
-            if len(stack) > 1 and stack[-1][0] == ord(off):
+            if len(stack) > 1 and stack[-1][0] == ord(s[i + 1]):
                 color, children = stack.pop()
                 stack[-1][1].append(ColorNode(color=color, content=children))
-        elif (text := m['text']) is not None:
-            # Escapes are rare, so skip the substitution when there are none.
-            if '\x03' in text:
-                text = re.sub(r'\x03(.?)', r'\1', text, flags=re.DOTALL)
+            i += 2
+        elif c == _INV:
+            # A lone invisible byte with no tag or payload, e.g. two before a Hex-Rays `}`. Skip it like tag_remove.
+            i += 1
+        else:
+            # Plain text, through escapes: an ESC takes the next char as text, whatever it is, or nothing at the end.
+            end = _text_end(s, i)
+            text = s[i:end]
+            while end < n and s[end] == _ESC:
+                i, end = end, _text_end(s, min(end + 2, n))
+                text += s[i + 1 : end]
+            i = end
             # Text on both sides of a skipped OFF or INV joins into one string.
             if content and isinstance(content[-1], str):
                 content[-1] += text
             elif text:
                 content.append(text)
-        elif m['addr'] is not None:
-            if (addr_hex := m['hex']) is None:
-                raise ParseError('Unexpected end of input')
-            # Checked by hand because int(x, 16) also takes signs, whitespace, underscores and a 0x prefix.
-            if not _HEX_DIGITS.issuperset(addr_hex):
-                raise ParseError(f'Invalid hex address: {addr_hex}')
-            content.append(ColorAddr(addr=int(addr_hex, 16), text=m['addr_text']))
-        elif m['semspan'] is not None:
-            # The header is dropped like tag_remove does. The span is an ordinary tag 54 node.
-            if m['sem_header'] is None:
-                raise ParseError('Unexpected end of input')
-            stack.append((ColorTag.SEMSPAN.value, []))
-        elif m['bad'] == chr(ControlChar.COLOR_INV.value):
-            # A lone invisible byte with no tag or payload, e.g. two before a Hex-Rays `}`. Skip it like tag_remove.
-            continue
-        else:
-            raise ParseError('Unexpected end of input')
     if len(stack) > 1:
         raise ParseError('Unclosed color tag')
     return ColorNode(color=None, content=stack[0][1])
