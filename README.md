@@ -33,6 +33,22 @@ $ uv run ida-colors <path-to-idb>
 `u32()`, and return `None` when it doesn't fit. Spellings other than plain decimal, `0x10` and `10h` (floats, chars,
 other radixes) are skipped rather than guessed.
 
+### Strings
+
+`strings()` returns the strings and chars that IDA shows in a line's automatic comments, as printed: quotes removed,
+escapes kept.
+
+```python
+>>> from ida_colors import parse_full, strings
+>>> strings(parse_full(ida_lines.generate_disasm_line(ea, 0)))  # lea rsi, aSslSession ; "SSL-Session:\n"
+[String(text='SSL-Session:\\n', char=False, addr=844343, truncated=False)]
+```
+
+`addr` is where the string starts, also when IDA shows it through a pointer (`"/dev/urandom" ...`). `truncated` is
+true when IDA cut it short (`"abi.NewName: tag too long: hw.optional."...`). Chars (`sub esi, 35h ; '5'`) have `char`
+set and no `addr`. Names shown the same way (`; __gmon_start__`) and anything else that doesn't look exactly like a
+string or a char are skipped.
+
 The CLI needs IDA 9+ and the `ida` extra (`idapro`). The parser itself has no dependencies.
 
 ## Development
@@ -45,7 +61,8 @@ $ uv run pytest
 
 `tests/test_ida_constants.py` checks the constants copied from IDA against a local IDA install, and is
 skipped when `idapro` can't load one. `tests/test_ida_numbers.py` checks parsed immediates against IDA's operand values
-on every `.i64` in `$IDA_COLORS_IDBS` (opened as temporary copies), and is skipped when it's unset.
+on every `.i64` in `$IDA_COLORS_IDBS` (opened as temporary copies), and `tests/test_ida_strings.py` checks parsed
+strings against the string literals there. Both are skipped when it's unset.
 
 ## Why?
 

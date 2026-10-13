@@ -16,6 +16,7 @@ from ida_colors.color_parser import (
 )
 from ida_colors.numbers import Number, numbers, parse_int
 from ida_colors.pretty import format_line, format_node
+from ida_colors.strings import String, strings
 
 __all__ = [
     'AddressSize',
@@ -26,6 +27,7 @@ __all__ = [
     'ControlChar',
     'Number',
     'ParseError',
+    'String',
     'UnknownColorError',
     'format_line',
     'format_node',
@@ -34,5 +36,6 @@ __all__ = [
     'parse_full',
     'parse_int',
     'simplify_color_tree',
+    'strings',
     'tag_remove',
 ]
