@@ -16,6 +16,23 @@ $ uv run ida-colors <path-to-idb>
 ...
 ```
 
+### Numbers
+
+`numbers()` returns the integers of a parsed line, with the `-` printed in front of each one applied:
+
+```python
+>>> from ida_colors import numbers, parse_full
+>>> numbers(parse_full(ida_lines.generate_disasm_line(ea, 0)))  # STP XZR, XZR, [X1,#-0xD8]
+[Number(value=-216, operand=3, standalone=False)]
+```
+
+`standalone` is true when the number is the entire operand, give or take a `#`, `=` or `-`: `#0x10`, `-1` and
+`=0xCBF29CE4` are, while `[X1,#0x10]` and `[rsp+28h+var_20]` are not.
+
+`u8()` to `u64()` and `i8()` to `i64()` reinterpret the value at a width, so `-1` and `0xFFFFFFFF` compare equal as
+`u32()`, and return `None` when it doesn't fit. Spellings other than plain decimal, `0x10` and `10h` (floats, chars,
+other radixes) are skipped rather than guessed.
+
 The CLI needs IDA 9+ and the `ida` extra (`idapro`). The parser itself has no dependencies.
 
 ## Development
@@ -27,7 +44,8 @@ $ uv run pytest
 ```
 
 `tests/test_ida_constants.py` checks the constants copied from IDA against a local IDA install, and is
-skipped when `idapro` can't load one.
+skipped when `idapro` can't load one. `tests/test_ida_numbers.py` checks parsed immediates against IDA's operand values
+on every `.i64` in `$IDA_COLORS_IDBS` (opened as temporary copies), and is skipped when it's unset.
 
 ## Why?
 
