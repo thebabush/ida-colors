@@ -7,6 +7,7 @@ from ida_colors.color_parser import (
     ColorTag,
     ParseError,
     UnknownColorError,
+    iter_nodes,
     parse_colored_string,
     parse_full,
     tag_remove,
@@ -166,3 +167,23 @@ def test_unknown_color_tag() -> None:
     assert ColorTag.from_int(33) is ColorTag.REG
     with pytest.raises(UnknownColorError, match='0x31'):
         ColorTag.from_int(0x31)
+
+
+def test_iter_nodes_is_top_down() -> None:
+    # mov [rbp+8], rax
+    raw = (
+        '\x01\x05mov\x02\x05 \x01)\x01\t[\x02\t\x01!rbp\x02!\x01\t+\x02\t\x01\x0c8\x02\x0c\x01\t]\x02\t\x02)'
+        '\x01\t,\x02\t \x01*\x01!rax\x02!\x02*'
+    )
+    colors = [node.color for node in iter_nodes(parse_full(raw))]
+    assert colors == [None, 5, 41, 9, 33, 9, 12, 9, 9, 42, 33]
+
+
+def test_iter_nodes_includes_the_tree_itself() -> None:
+    node = ColorNode(color=5, content=['nop'])
+    assert list(iter_nodes(node)) == [node]
+
+
+@pytest.mark.parametrize('tree', ['text', ColorAddr(addr=0x1234, text='name')])
+def test_iter_nodes_without_nodes(tree: str | ColorAddr) -> None:
+    assert list(iter_nodes(tree)) == []

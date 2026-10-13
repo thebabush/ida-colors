@@ -4,8 +4,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ida_colors._compat import assert_never
-from ida_colors.color_parser import ColorAddr, ColorNode, Colors, ColorTag
+from ida_colors.color_parser import ColorAddr, Colors, ColorTag, iter_nodes
 
 # `; ` on most processors, `# ` on PowerPC, RISC-V and s390x, ` # ` on MIPS.
 _PREFIX = re.compile(r' ?[;#] ')
@@ -43,21 +42,10 @@ def _autocmt(content: Sequence[Colors], out: list[String]) -> None:
             pass
 
 
-def _walk(node: Colors, out: list[String]) -> None:
-    match node:
-        case ColorNode(color=color, content=content):
-            if color == ColorTag.AUTOCMT.value:
-                _autocmt(content, out)
-            for child in content:
-                _walk(child, out)
-        case ColorAddr() | str():
-            pass
-        case _:
-            assert_never(node)
-
-
 def strings(tree: Colors) -> list[String]:
     """Return the strings and chars in a line's automatic comments, in order. Other comment text is skipped."""
     out: list[String] = []
-    _walk(tree, out)
+    for node in iter_nodes(tree):
+        if node.color == ColorTag.AUTOCMT.value:
+            _autocmt(node.content, out)
     return out

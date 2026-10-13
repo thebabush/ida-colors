@@ -4,8 +4,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ida_colors._compat import assert_never
-from ida_colors.color_parser import ColorAddr, ColorNode, Colors, ColorTag, tag_remove
+from ida_colors.color_parser import ColorNode, Colors, ColorTag, tag_remove
 
 # Decimal without a leading 0 (some assemblers read 010 as octal), 0x-prefixed hex, or h-suffixed hex that starts with
 # a digit (IDA adds a 0 when it would start with a letter, otherwise it reads as a name).
@@ -96,32 +95,27 @@ def _is_standalone(siblings: Sequence[Colors], index: int) -> bool:
     )
 
 
-def _walk(node: Colors, operand: int | None, out: list[Number]) -> None:
-    match node:
-        case ColorNode(color=color, content=content):
-            if color in _OPERAND_TAGS:
-                operand = _OPERAND_TAGS[color]
-            for i, child in enumerate(content):
-                if isinstance(child, ColorNode) and child.color in _NUMBER_TAGS:
-                    if (value := parse_int(tag_remove(child))) is not None:
-                        out.append(
-                            Number(
-                                value=-value if _is_negated(content, i) else value,
-                                operand=operand,
-                                # Only a direct child of the operand can be the whole operand.
-                                standalone=color in _OPERAND_TAGS and _is_standalone(content, i),
-                            )
-                        )
-                else:
-                    _walk(child, operand, out)
-        case ColorAddr() | str():
-            pass
-        case _:
-            assert_never(node)
+def _walk(node: ColorNode, operand: int | None, out: list[Number]) -> None:
+    operand = _OPERAND_TAGS.get(node.color, operand)
+    for i, child in enumerate(node.content):
+        if not isinstance(child, ColorNode):
+            continue
+        if child.color not in _NUMBER_TAGS:
+            _walk(child, operand, out)
+        elif (value := parse_int(tag_remove(child))) is not None:
+            out.append(
+                Number(
+                    value=-value if _is_negated(node.content, i) else value,
+                    operand=operand,
+                    # Only a direct child of the operand can be the whole operand.
+                    standalone=node.color in _OPERAND_TAGS and _is_standalone(node.content, i),
+                )
+            )
 
 
 def numbers(tree: Colors) -> list[Number]:
     """Return the integers in a parsed line, in order. Floats and spellings that aren't plain integers are skipped."""
     out: list[Number] = []
-    _walk(tree, None, out)
+    if isinstance(tree, ColorNode):
+        _walk(tree, None, out)
     return out

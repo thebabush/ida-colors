@@ -1,6 +1,6 @@
 import re
 import string
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from functools import cache
@@ -213,5 +213,18 @@ def tag_remove(node: Colors) -> str:
             return text
         case str():
             return node
+        case _:
+            assert_never(node)
+
+
+def iter_nodes(node: Colors) -> Iterator[ColorNode]:
+    """Yield every colored node, the tree itself included, top-down in the order they're printed."""
+    match node:
+        case ColorNode(content=content):
+            yield node
+            for child in content:
+                yield from iter_nodes(child)
+        case ColorAddr() | str():
+            pass
         case _:
             assert_never(node)
