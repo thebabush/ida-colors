@@ -31,7 +31,8 @@ $ uv run ida-colors <path-to-idb>
 
 `u8()` to `u64()` and `i8()` to `i64()` reinterpret the value at a width, so `-1` and `0xFFFFFFFF` compare equal as
 `u32()`, and return `None` when it doesn't fit. Spellings other than plain decimal, `0x10` and `10h` (floats, chars,
-other radixes) are skipped rather than guessed.
+other radixes) are skipped rather than guessed. Void operands, immediates that IDA colors differently because they fall
+inside the database's address range, count as numbers too, so the result doesn't depend on the image base.
 
 ### Strings
 

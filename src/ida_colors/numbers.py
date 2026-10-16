@@ -11,7 +11,9 @@ from ida_colors.color_parser import ColorNode, Colors, ColorTag, tag_remove
 _INT = re.compile(r'(?P<dec>0|[1-9][0-9]*)|0x(?P<hex>[0-9A-Fa-f]+)|(?P<hex_h>[0-9][0-9A-Fa-f]*)h')
 
 _SYMBOL = ColorTag.SYMBOL.value
-_NUMBER_TAGS = frozenset({ColorTag.NUMBER.value, ColorTag.DNUM.value})
+# IDA prints an untyped immediate as VOIDOP instead of NUMBER when its value falls inside the database's address range,
+# so which of the two a constant gets depends on the image base, not on the code.
+_NUMBER_TAGS = frozenset({ColorTag.NUMBER.value, ColorTag.DNUM.value, ColorTag.VOIDOP.value})
 _OPERAND_TAGS = {tag.value: int(tag.name[4:]) for tag in ColorTag if tag.name.startswith('OPND')}
 
 # Symbols that can stand next to a number that is a whole operand, e.g. `#0x10`, `-1`, `=0xCBF29CE4`.

@@ -1,4 +1,5 @@
 # Frozen copy of ida_colors at commit cadd518, used as the oracle for behavior-preserving changes. Do not edit.
+# Exception: VOIDOP counts as a number, an intended behavior change made after cadd518.
 """Integer values of the numbers in a parsed line, as IDA printed them."""
 
 import re
@@ -11,7 +12,7 @@ from ida_colors_ref.color_parser import ColorNode, Colors, ColorTag, tag_remove
 # a digit (IDA adds a 0 when it would start with a letter, otherwise it reads as a name).
 _INT = re.compile(r'(?P<dec>0|[1-9][0-9]*)|0x(?P<hex>[0-9A-Fa-f]+)|(?P<hex_h>[0-9][0-9A-Fa-f]*)h')
 
-_NUMBER_TAGS = frozenset({ColorTag.NUMBER.value, ColorTag.DNUM.value})
+_NUMBER_TAGS = frozenset({ColorTag.NUMBER.value, ColorTag.DNUM.value, ColorTag.VOIDOP.value})
 _OPERAND_TAGS = {tag.value: int(tag.name[4:]) for tag in ColorTag if tag.name.startswith('OPND')}
 
 # Symbols that can stand next to a number that is a whole operand, e.g. `#0x10`, `-1`, `=0xCBF29CE4`.

@@ -62,6 +62,14 @@ def test_immediate_decimal() -> None:
     assert _numbers(raw) == [Number(value=8, operand=2, standalone=True)]
 
 
+def test_void_operand() -> None:
+    # CMP.W R3, #0x4B000 in libamp.so (ARM, based at 0), where the value falls inside a segment
+    raw = (
+        '\x01\x05CMP.W\x02\x05           \x01)\x01!R3\x02!\x02)\x01\t,\x02\t \x01*\x01\t#\x02\t\x01\r0x4B000\x02\r\x02*'
+    )
+    assert _numbers(raw) == [Number(value=0x4B000, operand=2, standalone=True)]
+
+
 @pytest.mark.parametrize(
     ('raw', 'value'),
     [
